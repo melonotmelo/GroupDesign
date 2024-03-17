@@ -1,0 +1,69 @@
+name: omniarch 2d resolution 64_64 baseline test base
+workspace: groupdesign
+project:  # to modify
+checkpoint_storage:
+  save_trial_best: 3
+  save_trial_latest: 1
+  access_key: wangzm
+  secret_key: wzmwzmbuaa
+  bucket: det-ckpt-storage
+  endpoint_url: http://10.212.253.24:9000
+  prefix: s3_store
+  type: s3
+environment:
+  image:
+    cuda: registry.actsmart.xueyuan:5100/wangzm_envs:mc
+    # cuda: registry.actsmart.shahe:5000/wangzm_envs:mc
+resources:
+    resource_pool: RTX4090-X
+    slots_per_trial: 1
+    shm_size: 549755813888
+
+hyperparameters:
+  # training
+  train_batch_size: 16
+  eval_batch_size: 32
+  lr: 5e-5
+
+  # model
+  channels: 11
+  train_img_size: 32
+  eval_img_size: 32
+  patch_size: 4
+  num_t: 10
+  phy_pred_method: patch # patch, step
+
+  # transformer
+  num_hidden_layers: 12
+  hidden_dim: 768
+  num_heads: 12
+
+  dropout_rate: 0.1
+  # continue
+  checkpoint_folder: d27dcd2e-f30a-476b-a2d5-7d6ca56fa7d0
+  continue: true
+  # scheduler
+  scheduler:
+    epochs: 1
+    batch_size: 16
+    records_per_epoch: 54594540
+    pct_start: 0.001
+
+records_per_epoch: 54594560
+searcher:
+  name: single
+  metric: loss
+  max_length:
+    epochs: 1
+entrypoint: train:UniPDETrial
+min_validation_period:
+  batches: 10000
+profiling:
+  begin_on_batch: 0
+  enabled: true
+  end_after_batch: null
+  sync_timings: true
+optimizations:
+  aggregation_frequency: 16
+  gradient_compression: true
+  average_training_metrics: false

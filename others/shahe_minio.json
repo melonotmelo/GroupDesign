@@ -1,0 +1,7 @@
+{
+  "url": "http://192.168.5.174:9000",
+  "accessKey": "wangzm",
+  "secretKey": "wzmwzmbuaa",
+  "api": "s3v4",
+  "path": "auto"
+}
