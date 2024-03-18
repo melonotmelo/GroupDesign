@@ -3,8 +3,10 @@ import math
 import einops
 import torch
 from torch import nn
-
+import json
 from models.revin import RevIN
+import socket
+import time
 
 device = torch.device("cuda" if torch.cuda.is_available() else 'cpu')
 
@@ -22,7 +24,7 @@ class Jetson(nn.Module):
     def forward(self, phy_fls, attention_mask=None):
         # phy_fls: B T C X (Y) (Z)
         phy_fls = einops.rearrange(phy_fls, 'b t c ... -> b t ... c')
-        phy_fls = self.revin(phy_fls, "norm")
+        # phy_fls = self.revin(phy_fls, "norm")
         return phy_fls
 
 
@@ -32,8 +34,8 @@ if __name__ == "__main__":
         patch_size=16,
         num_hidden_layers=12,
         num_t=10,
-        # train_img_size=64,
-        # eval_img_size=64,
+        train_img_size=32,
+        eval_img_size=32,
         channels=4,
         phy_pred_method='step',
         num_heads=8,
@@ -44,8 +46,18 @@ if __name__ == "__main__":
     phy_fls_3d = phy_fls_2d.unsqueeze(3).repeat(1, 1, 1, 64, 1, 1)
     data = [phy_fls_1d, phy_fls_2d, phy_fls_3d]
     model_.eval()
-    import random
-
-    phy_fls = data[random.randint(0, 2)]
     with torch.no_grad():  # 不计算梯度，节省计算资源
-        pred = model_(phy_fls)
+        pred = model_(phy_fls_2d)
+    pred_list = pred.tolist()
+    f2 = open('data_to_send.json', 'w')
+    serialized_data = json.dump(pred_list, f2)
+    f2.close()
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        server_host = '192.168.83.1'
+        server_port = 12345
+        s.connect((server_host, server_port))
+        start_time = time.time()
+        s.sendall(serialized_data)
+        response = s.recv(1024)
+        end_time = time.time()
+        print(f"Received response: {response.decode()} in {end_time - start_time} seconds")

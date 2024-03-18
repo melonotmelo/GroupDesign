@@ -8,6 +8,7 @@ from models.revin import RevIN
 from models.transformer import Transformer
 from others.data_information import *
 from random import choice
+import socket
 
 
 def _trunc_normal_(tensor, mean, std, a, b):
@@ -193,7 +194,7 @@ class OmniArch(nn.Module):
 
         # revin
         channels = config['channels']
-        # self.revin = RevIN(channels)
+        self.revin = RevIN(channels)
 
         # model layers
         self.encoder = OmniArchEncoder(**config)
@@ -205,7 +206,7 @@ class OmniArch(nn.Module):
     def forward(self, phy_fls, attention_mask=None):
         # phy_fls: B T C X (Y) (Z)
         # phy_fls = einops.rearrange(phy_fls, 'b t c ... -> b t ... c')
-        # phy_fls = self.revin(phy_fls, "norm")
+        phy_fls = self.revin(phy_fls, "norm")
         embedding = self.encoder(phy_fls)
         # embedding: B (T X (Y) (Z)) H
         hidden_states = self.backbone(
@@ -270,13 +271,36 @@ if __name__ == '__main__':
         dropout_rate=0.1
     ).to(device)
 
-    phy_fls_1d = torch.randn((1, 10, 4, 64)).to(device)
-    phy_fls_2d = phy_fls_1d.unsqueeze(3).repeat(1, 1, 1, 64, 1)
-    phy_fls_3d = phy_fls_2d.unsqueeze(3).repeat(1, 1, 1, 64, 1, 1)
-    data = [phy_fls_1d, phy_fls_2d, phy_fls_3d]
+    # phy_fls_1d = torch.randn((1, 10, 4, 64)).to(device)
+    # phy_fls_2d = phy_fls_1d.unsqueeze(3).repeat(1, 1, 1, 64, 1)
+    # phy_fls_3d = phy_fls_2d.unsqueeze(3).repeat(1, 1, 1, 64, 1, 1)
+    # data = [phy_fls_1d, phy_fls_2d, phy_fls_3d]
+    import json
+    import time
+
+    host = '192.168.83.1'
+    port = 12345
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.bind((host, port))
+        s.listen()
+        print(f"Server listening on {host}:{port}")
+        conn, addr = s.accept()
+        with conn:
+            print(f"Connected by {addr}")
+            start_time = time.time()  # 开始时间
+            while True:
+                data = conn.recv(1024)
+                if not data:
+                    break
+                received_data = json.loads(data.decode('utf-8'))
+                end_time = time.time()  # 结束时间
+                print(f"Received data: {data.decode()} in {end_time - start_time} seconds")
+                conn.sendall(b'Data received')
+    data_middle = json.load(received_data)
+    phy_fls = torch.tensor(data_middle)
     model_.eval()
-    import random
-    phy_fls = data[random.randint(0, 2)]
+    # import random
+    # phy_fls = data[random.randint(0, 2)]
     with torch.no_grad():  # 不计算梯度，节省计算资源
         pred = model_(phy_fls)
 
