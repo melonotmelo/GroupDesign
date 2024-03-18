@@ -4,7 +4,7 @@ import einops
 import torch
 from torch import nn
 import json
-from models.revin import RevIN
+from revin import RevIN
 import socket
 import time
 
@@ -50,14 +50,22 @@ if __name__ == "__main__":
         pred = model_(phy_fls_2d)
     pred_list = pred.tolist()
     f2 = open('data_to_send.json', 'w')
-    serialized_data = json.dump(pred_list, f2)
+    json.dump(pred_list, f2)
     f2.close()
+    server_host = '192.168.83.1'
+    server_port = 12345
+    buffer_size = 6400
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        server_host = '192.168.83.1'
-        server_port = 12345
         s.connect((server_host, server_port))
         start_time = time.time()
-        s.sendall(serialized_data)
+        with open('data_to_send.json', 'rb') as file:
+            while True:
+                bytes_read = file.read(buffer_size)
+                s.sendall(bytes_read)
+                if not bytes_read:
+                    s.sendall(b'EOF')
+                    break  # 文件结束
+            file.close()
         response = s.recv(1024)
         end_time = time.time()
         print(f"Received response: {response.decode()} in {end_time - start_time} seconds")

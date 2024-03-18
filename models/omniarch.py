@@ -277,9 +277,11 @@ if __name__ == '__main__':
     # data = [phy_fls_1d, phy_fls_2d, phy_fls_3d]
     import json
     import time
+    import pickle
 
     host = '192.168.83.1'
     port = 12345
+    buffer_size = 6400
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.bind((host, port))
         s.listen()
@@ -287,16 +289,21 @@ if __name__ == '__main__':
         conn, addr = s.accept()
         with conn:
             print(f"Connected by {addr}")
-            start_time = time.time()  # 开始时间
-            while True:
-                data = conn.recv(1024)
-                if not data:
-                    break
-                received_data = json.loads(data.decode('utf-8'))
+            with open('received_file.json', 'wb') as file:
+                start_time = time.time()  # 开始时间
+                while True:
+                    bytes_read = conn.recv(buffer_size)
+                    if bytes_read==b'EOF':
+                        break  # 客户端关闭了连接
+                    file.write(bytes_read)
+                    # received_data = json.loads(data.decode('utf-8'))
                 end_time = time.time()  # 结束时间
-                print(f"Received data: {data.decode()} in {end_time - start_time} seconds")
-                conn.sendall(b'Data received')
-    data_middle = json.load(received_data)
+                print(f"Received data: in {end_time - start_time} seconds")
+                file.close()
+            conn.sendall(b'Data received')
+    with open('received_file.json', 'r') as file:
+        data_middle = json.load(file)
+        file.close()
     phy_fls = torch.tensor(data_middle)
     model_.eval()
     # import random
