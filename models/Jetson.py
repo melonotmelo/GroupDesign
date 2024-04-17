@@ -4,7 +4,9 @@ import einops
 import torch
 from torch import nn
 import json
-from revin import RevIN
+from models.revin import RevIN
+from models.omniarch import *
+from models.transformer import *
 import socket
 import time
 
@@ -20,15 +22,20 @@ class Jetson(nn.Module):
         # revin
         channels = config['channels']
         self.revin = RevIN(channels)
+        self.encoder = OmniArchEncoder(**config)
+        self.backbone = Transformer(**config)
+        self.decoder = OmniArchDecoder(**config)
+        # init params
 
     def forward(self, phy_fls, attention_mask=None):
         # phy_fls: B T C X (Y) (Z)
         phy_fls = einops.rearrange(phy_fls, 'b t c ... -> b t ... c')
-        # phy_fls = self.revin(phy_fls, "norm")
-        return phy_fls
+        phy_fls, mean, stdev = self.revin(phy_fls, 0, 0, "norm")
+        embedding = self.encoder(phy_fls)
+        return embedding, mean, stdev
 
 
-if __name__ == "__main__":
+def run_edge():
     model_ = Jetson(
         hidden_dim=128,
         patch_size=16,
@@ -52,7 +59,7 @@ if __name__ == "__main__":
     f2 = open('data_to_send.json', 'w')
     json.dump(pred_list, f2)
     f2.close()
-    server_host = '192.168.83.1'
+    server_host = '192.168.31.60'
     server_port = 12345
     buffer_size = 6400
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:

@@ -1,4 +1,5 @@
 import math
+import os.path
 
 import einops
 import torch
@@ -203,18 +204,18 @@ class OmniArch(nn.Module):
         # init params
         self.apply(_init_weights)
 
-    def forward(self, phy_fls, attention_mask=None):
+    def forward(self, embedding,mean,stdev,attention_mask=None):
         # phy_fls: B T C X (Y) (Z)
         # phy_fls = einops.rearrange(phy_fls, 'b t c ... -> b t ... c')
-        phy_fls = self.revin(phy_fls, "norm")
-        embedding = self.encoder(phy_fls)
+        # phy_fls = self.revin(phy_fls, "norm")
+        # embedding = self.encoder(phy_fls)
         # embedding: B (T X (Y) (Z)) H
         hidden_states = self.backbone(
             x=embedding, attention_mask=attention_mask
         )
         pred = self.decoder(hidden_states)
         # pred: B T X (Y) (Z) C
-        pred = self.revin(pred, "denorm")
+        pred = self.revin(pred,mean,stdev, "denorm")
         pred = einops.rearrange(pred, 'b t ... c -> b t c ...')
         return pred
 
@@ -276,10 +277,10 @@ if __name__ == '__main__':
     # phy_fls_3d = phy_fls_2d.unsqueeze(3).repeat(1, 1, 1, 64, 1, 1)
     # data = [phy_fls_1d, phy_fls_2d, phy_fls_3d]
     import json
-    import time
-    import pickle
 
-    host = '192.168.83.1'
+    import time
+
+    host = '192.168.31.60'
     port = 12345
     buffer_size = 6400
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
@@ -290,10 +291,18 @@ if __name__ == '__main__':
         with conn:
             print(f"Connected by {addr}")
             with open('received_file.json', 'wb') as file:
-                start_time = time.time()  # 开始时间
+                times = 0
                 while True:
                     bytes_read = conn.recv(buffer_size)
-                    if bytes_read==b'EOF':
+                    if times == 0:
+                        start_time = time.time()
+                        times += 1
+                    # bytes_read, addr = s.recvfrom(buffer_size)
+                    # print(bytes_read)
+                    # if not bytes_read:
+                    if bytes_read.endswith(b'EOF'):
+                        bytes_read = bytes_read[:-3]
+                        file.write(bytes_read)
                         break  # 客户端关闭了连接
                     file.write(bytes_read)
                     # received_data = json.loads(data.decode('utf-8'))
@@ -312,7 +321,7 @@ if __name__ == '__main__':
         pred = model_(phy_fls)
 
     # 处理推理结果，例如打印输出
-    print(pred)
+    # print(pred)
     # optm = torch.optim.Adam(model_.parameters(), lr=0.0001)
     # import random
     # for e in range(10000):

@@ -1,0 +1,34 @@
+syntax = "proto3";
+
+package filetransfer;
+
+service FileTransferService {
+  // Sends a file in multiple chunks.
+  rpc SendFile(stream FileChunk) returns (TransferStatus) {}
+
+  rpc EndFileTransfer(EndSignal) returns (EndResponse) {}
+}
+
+// The request message containing a chunk of the file.
+message FileChunk {
+  bytes data = 1;
+}
+
+// The response message indicating the transfer status.
+message TransferStatus {
+  bool success = 1;
+  string message = 2;
+}
+
+// Message to indicate the end of the file transfer and include additional data.
+message EndSignal {
+  string message = 1;
+  repeated double value1 = 2; // First float variable
+  repeated double value2 = 3; // Second float variable
+}
+
+// Response to the end of file transfer signal.
+message EndResponse {
+  bool success = 1;
+  string message = 2;
+}
